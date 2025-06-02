@@ -2,59 +2,110 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <ArduinoJson.h>
 
-// Pin Definitions
-#define LED_PIN 22
-#define JOYSTICK_X_PIN 34 // Analog input for X-axis
-#define JOYSTICK_Y_PIN 35 // Analog input for Y-axis
-#define BUTTON_A_PIN 13   // Push down (A) and pair mode button
-#define BUTTON_B_PIN 12   // Rotation (B) button
+// BLE Service and Characteristic UUIDs
+#define SERVICE_UUID        "e10ae3ca-6474-445b-affa-05ea0c8ef57a"
+#define COMMAND_CHAR_UUID   "47c39e7f-43d8-4d16-9b99-77ad1ee4d1c3"
+#define STATE_CHAR_UUID     "e4f49389-330b-4e8f-a771-a8056fb6367a"
 
-// Calibration for joystick (adjust as needed)
-const int x_center = 512;
-const int y_center = 512;
-const int deadzone = 30;
+// Pin definitions based on your diagram
+#define JOYSTICK_X_PIN 34
+#define JOYSTICK_Y_PIN 35
+#define JOYSTICK_BUTTON_PIN 32
+#define START_BUTTON_PIN 27
+#define DOWN_BUTTON_PIN 25
+#define TURN_BUTTON_PIN 26
+#define STATUS_LED_PIN 22
 
-// Bluetooth connection state
-bool connectedToBT = false;
-bool pairingMode = false;
+// Joystick thresholds
+#define JOYSTICK_THRESHOLD 0
+#define JOYSTICK_CENTER 2800
 
-// LED Blinking Timers
-unsigned long previousMillis = 0;
-const long blinkIntervalConnected = 1000; // Slow blink when waiting
-const long blinkIntervalPairing = 250;    // Fast blink in pairing mode
+// Button debounce
+unsigned long lastButtonPress = 0;
+const unsigned long debounceDelay = 150;
 
-// Button States and Timing
-bool buttonAState, lastButtonAState = HIGH;
-bool buttonBState, lastButtonBState = HIGH;
-unsigned long buttonAPressStartTime = 0;
+// Joystick state tracking
+bool joystickLeftPressed = false;
+bool joystickRightPressed = false;
+bool joystickDownPressed = false;
 
-// Joystick Command Tracking
-String lastJoystickCommand = "";
+// Button state tracking
+bool startButtonPressed = false;
+bool downButtonPressed = false;
+bool turnButtonPressed = false;
+bool joystickButtonPressed = false;
 
-// UUIDs - Use custom UUIDs for production
-static BLEUUID service_uuid("F0E1D2C3-B4A5-4CD8-A9B7-C6D5E4F3A2B1");
-static BLEUUID characteristic_uuid("12AB34CD-56EF-4789-B3C2-D1E0F9A8BCD0");
-
-// Global variables
+// BLE variables
 BLEServer* pServer = NULL;
-BLEService* pService = NULL;
-BLECharacteristic* pCharacteristic = NULL;
+BLECharacteristic* pCommandCharacteristic = NULL;
+BLECharacteristic* pStateCharacteristic = NULL;
+bool deviceConnected = false;
+bool oldDeviceConnected = false;
+
+// LED blink state
+unsigned long lastLedBlink = 0;
+bool ledState = false;
 
 class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) override {
-        connectedToBT = true;
-        digitalWrite(LED_PIN, HIGH); // Turn LED solid when connected
+    void onConnect(BLEServer* pServer) {
+      deviceConnected = true;
+      Serial.println("BLE Client Connected");
+      digitalWrite(STATUS_LED_PIN, HIGH);
+    };
+
+    void onDisconnect(BLEServer* pServer) {
+      deviceConnected = false;
+      Serial.println("BLE Client Disconnected");
+      digitalWrite(STATUS_LED_PIN, LOW);
+    }
+};
+
+void handleBLEMessage(const char* message) {
+  StaticJsonDocument<500> doc;
+  DeserializationError error = deserializeJson(doc, message);
+  
+  if (error) {
+    Serial.print("JSON parsing failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+  
+  const char* type = doc["type"];
+  
+  if (strcmp(type, "gameState") == 0) {
+    bool isGameOver = doc["isGameOver"];
+    bool isPaused = doc["isPaused"];
+    int score = doc["score"];
+    int level = doc["level"];
+    
+    // LED feedback based on game state
+    if (isGameOver) {
+      blinkStatusLED(3, 200); // 3 fast blinks for game over
+    } else if (isPaused) {
+      blinkStatusLED(1, 500); // 1 slow blink for pause
     }
     
-    void onDisconnect(BLEServer* pServer) override {
-        connectedToBT = false;
-        pairingMode = false; // Exit pairing mode if disconnected
-        
-        // Restart advertising to allow reconnection
-        BLEDevice::startAdvertising();
-        
-        previousMillis = millis(); // Reset blinking timer
+    Serial.printf("Game State - Score: %d, Level: %d, GameOver: %s, Paused: %s\n", 
+                  score, level, isGameOver ? "true" : "false", isPaused ? "true" : "false");
+  }
+  else if (strcmp(type, "lineCleared") == 0) {
+    int linesCleared = doc["lines"];
+    blinkStatusLED(linesCleared, 100);
+    Serial.printf("Lines cleared: %d\n", linesCleared);
+  }
+}
+
+class MyCharacteristicCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      String value = pCharacteristic->getValue();
+      
+      if (value.length() > 0) {
+        Serial.print("Received from web app: ");
+        Serial.println(value.c_str());
+        handleBLEMessage(value.c_str());
+      }
     }
 };
 
@@ -62,118 +113,195 @@ void setup() {
   Serial.begin(115200);
   
   // Initialize pins
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(BUTTON_A_PIN, INPUT_PULLUP);
-  pinMode(BUTTON_B_PIN, INPUT_PULLUP);
+  pinMode(JOYSTICK_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(START_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(DOWN_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(TURN_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(STATUS_LED_PIN, OUTPUT);
   
-  // Start up blinking LED (waiting for connection)
-  digitalWrite(LED_PIN, LOW);
+  // Initialize status LED (off)
+  digitalWrite(STATUS_LED_PIN, LOW);
   
-  // Create BLE server and service
-  BLEDevice::init("TetrisController");
+  // Initialize BLE
+  BLEDevice::init("ESP32-Tetris-Controller");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
-  
-  pService = pServer->createService(service_uuid);
-  pCharacteristic = pService->createCharacteristic(
-    characteristic_uuid,
-    BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_READ // <-- Add READ
-  );
-  pCharacteristic->setValue("IDLE");
-  
-  // Add descriptor for CCC (Client Characteristic Configuration)
-  pCharacteristic->addDescriptor(new BLE2902());
-  pService->start();
-  
-  // Start advertising
-  BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->setAppearance(0x03C8);
 
- BLEDevice::startAdvertising();
+  // Create BLE Service
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+
+  // Create Command Characteristic (for sending commands to web app)
+  pCommandCharacteristic = pService->createCharacteristic(
+                      COMMAND_CHAR_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_WRITE |
+                      BLECharacteristic::PROPERTY_NOTIFY | BLECharacteristic::PROPERTY_INDICATE
+                    );
+  
+
+  // Create State Characteristic (for receiving game state from web app)
+  pStateCharacteristic = pService->createCharacteristic(
+                      STATE_CHAR_UUID,
+                      BLECharacteristic::PROPERTY_READ |
+                      BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY
+                    );
+  pStateCharacteristic->setCallbacks(new MyCharacteristicCallbacks());
+
+
+  pCommandCharacteristic->addDescriptor(new BLE2902());
+  pStateCharacteristic->addDescriptor(new BLE2902());
+  // Start the service
+  pService->start();
+
+  // Start advertising
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setMinPreferred(0x06);
+  BLEDevice::startAdvertising();
+  
+  Serial.println("ESP32 Tetris BLE Controller initialized");
+  Serial.println("Waiting for BLE connection...");
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
-  
-  // Handle button A press for pairing mode
-  buttonAState = digitalRead(BUTTON_A_PIN);
-  
-  if (buttonAState == LOW && lastButtonAState == HIGH) {
-    buttonAPressStartTime = currentMillis;
+  // Handle BLE connection state
+  if (!deviceConnected && oldDeviceConnected) {
+    delay(200); // Give the bluetooth stack time to get ready
+    pServer->startAdvertising(); // Restart advertising
+    Serial.println("Start advertising");
+    oldDeviceConnected = deviceConnected;
   }
   
-  if (!connectedToBT && !pairingMode) {
-    // Check for long press to enter pairing mode
-    if (buttonAState == LOW && (currentMillis - buttonAPressStartTime > 5000)) {
-      pairingMode = true;
-      
-      previousMillis = currentMillis; // Reset blinking timer
-      
-      // Restart advertising in case we're disconnected
-      BLEDevice::startAdvertising();
+  if (deviceConnected && !oldDeviceConnected) {
+    oldDeviceConnected = deviceConnected;
+  }
+  // Blink LED when not connected
+  if (!deviceConnected) {
+    if (millis() - lastLedBlink > 500) {
+      ledState = !ledState;
+      digitalWrite(STATUS_LED_PIN, ledState);
+      lastLedBlink = millis();
     }
   }
   
-  lastButtonAState = buttonAState;
   
-  // Handle LED blinking based on state
-  if (!connectedToBT) {
-    unsigned long blinkInterval = pairingMode ? blinkIntervalPairing : blinkIntervalConnected;
-    
-    if (currentMillis - previousMillis >= blinkInterval) {
-      previousMillis = currentMillis;
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-    }
+  // Read and process inputs only when connected
+  if (deviceConnected) {
+    readJoystick();
+    readButtons();
   }
   
-  // If not connected, return early to save processing power
-  if (!connectedToBT || pCharacteristic == NULL) return;
-  
-  // Read joystick values with deadzone detection
-  int xVal = analogRead(JOYSTICK_X_PIN);
-  int yVal = analogRead(JOYSTICK_Y_PIN);
-  
-  String newCommand = "";
-  
-  // Determine command based on joystick position
-  if (xVal < x_center - deadzone) {
-    newCommand = "LEFT";
-  } else if (xVal > x_center + deadzone) {
-    newCommand = "RIGHT";
-  } else if (yVal < y_center - deadzone) {
-    newCommand = "DOWN";
+  delay(50);
+}
+
+void readJoystick() {
+  int xValue = analogRead(JOYSTICK_X_PIN);
+  int yValue = analogRead(JOYSTICK_Y_PIN);
+  Serial.println(xValue);
+  Serial.println(yValue);
+
+  // Check horizontal movement (left/right)
+  if (xValue < (JOYSTICK_CENTER - JOYSTICK_THRESHOLD) && !joystickLeftPressed) {
+    joystickLeftPressed = true;
+    sendGameCommand("moveLeft");
+    Serial.println("Joystick: Move Left");
+  } else if (xValue > (JOYSTICK_CENTER + JOYSTICK_THRESHOLD) && !joystickRightPressed) {
+    joystickRightPressed = true;
+    sendGameCommand("moveRight");
+    Serial.println("Joystick: Move Right");
+  } else if (xValue > (JOYSTICK_CENTER - JOYSTICK_THRESHOLD) && 
+             xValue < (JOYSTICK_CENTER + JOYSTICK_THRESHOLD)) {
+    joystickLeftPressed = false;
+    joystickRightPressed = false;
   }
   
-  // Send command over BLE if different from last and client is connected
-  if (newCommand != "" && connectedToBT) {
-    if (connectedToBT && newCommand != lastJoystickCommand) {
-      pCharacteristic->setValue(newCommand.c_str());
-      pCharacteristic->notify();
-      
-      lastJoystickCommand = newCommand;
-    }
-    
-    // Reset command when joystick returns to center
-  } else if (newCommand == "" && lastJoystickCommand.length() > 0) {
-    lastJoystickCommand = "";
+  // Check vertical movement (down)
+  if (yValue > (JOYSTICK_CENTER + JOYSTICK_THRESHOLD) && !joystickDownPressed) {
+    joystickDownPressed = true;
+    sendGameCommand("softDrop");
+    Serial.println("Joystick: Soft Drop");
+  } else if (yValue < (JOYSTICK_CENTER + JOYSTICK_THRESHOLD)) {
+    joystickDownPressed = false;
   }
   
-  // Handle button A (push down)
-  buttonAState = digitalRead(BUTTON_A_PIN);
-  if (buttonAState == LOW && !pairingMode) {
-    pCharacteristic->setValue("A");
-    pCharacteristic->notify();
-    
-    delay(200); // Simple debounce
-  }
-  
-  // Handle button B (rotation)
-  buttonBState = digitalRead(BUTTON_B_PIN);
-  if (buttonBState == LOW) {
-    pCharacteristic->setValue("B");
-    pCharacteristic->notify();
-    
-    delay(200); // Simple debounce
+  // Check joystick button (hard drop)
+  bool joystickButtonState = !digitalRead(JOYSTICK_BUTTON_PIN);
+  if (joystickButtonState && !joystickButtonPressed && 
+      (millis() - lastButtonPress > debounceDelay)) {
+    joystickButtonPressed = true;
+    lastButtonPress = millis();
+    sendGameCommand("hardDrop");
+    Serial.println("Joystick Button: Hard Drop");
+  } else if (!joystickButtonState) {
+    joystickButtonPressed = false;
   }
 }
 
+void readButtons() {
+  // Read START button (pause/resume)
+  bool startButtonState = !digitalRead(START_BUTTON_PIN);
+  if (startButtonState && !startButtonPressed && 
+      (millis() - lastButtonPress > debounceDelay)) {
+    startButtonPressed = true;
+    lastButtonPress = millis();
+    sendGameCommand("pause");
+    Serial.println("Start Button: Pause/Resume");
+  } else if (!startButtonState) {
+    startButtonPressed = false;
+  }
+  
+  // Read DOWN button (soft drop)
+  bool downButtonState = !digitalRead(DOWN_BUTTON_PIN);
+  if (downButtonState && !downButtonPressed && 
+      (millis() - lastButtonPress > debounceDelay)) {
+    downButtonPressed = true;
+    lastButtonPress = millis();
+    sendGameCommand("softDrop");
+    Serial.println("Down Button: Soft Drop");
+  } else if (!downButtonState) {
+    downButtonPressed = false;
+  }
+  
+  // Read TURN button (rotate)
+  bool turnButtonState = !digitalRead(TURN_BUTTON_PIN);
+  if (turnButtonState && !turnButtonPressed && 
+      (millis() - lastButtonPress > debounceDelay)) {
+    turnButtonPressed = true;
+    lastButtonPress = millis();
+    sendGameCommand("rotate");
+    Serial.println("Turn Button: Rotate");
+  } else if (!turnButtonState) {
+    turnButtonPressed = false;
+  }
+}
+
+void sendGameCommand(const char* command) {
+  if (!deviceConnected) return;
+  
+  // Create JSON message
+  StaticJsonDocument<200> doc;
+  doc["type"] = "gameCommand";
+  doc["command"] = command;
+  doc["timestamp"] = millis();
+  
+  String message;
+  serializeJson(doc, message);
+  
+  // Send via BLE
+  pCommandCharacteristic->setValue(message.c_str());
+  pCommandCharacteristic->notify();
+  
+  Serial.print("Sent: ");
+  Serial.println(message);
+}
+
+
+
+void blinkStatusLED(int times, int delayMs) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(STATUS_LED_PIN, LOW);
+    delay(delayMs);
+    digitalWrite(STATUS_LED_PIN, HIGH);
+    delay(delayMs);
+  }
+}

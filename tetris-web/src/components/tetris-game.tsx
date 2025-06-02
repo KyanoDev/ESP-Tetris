@@ -2,10 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { useBluetoothController } from "@/contexts/bluetooth-controller-context";
+import { useBLEController } from "@/hooks/use-ble-controller";
 import { useGameLogic } from "@/hooks/use-game-logic";
 import { useCallback, useEffect } from "react";
-import BluetoothStatus from "./bluetooth-status";
+import BLEConnection from "./ble-connection";
 import GameBoard from "./game-board";
 import GameControls from "./game-controls";
 import GameStats from "./game-stats";
@@ -30,7 +30,60 @@ export default function TetrisGame() {
 		resetGame,
 	} = useGameLogic();
 
-	const { setOnButtonPress } = useBluetoothController();
+	const handleBLECommand = useCallback(
+		(command: string) => {
+			if (isGameOver) return;
+
+			console.log(`Received command: ${command}`);
+			switch (command) {
+				case "moveLeft":
+					moveLeft();
+					break;
+				case "moveRight":
+					moveRight();
+					break;
+				case "rotate":
+					rotate();
+					break;
+				case "softDrop":
+					softDrop();
+					break;
+				case "hardDrop":
+					hardDrop();
+					break;
+				case "pause":
+					pauseGame();
+					break;
+				default:
+					break;
+			}
+		},
+		[
+			isGameOver,
+			moveLeft,
+			moveRight,
+			rotate,
+			softDrop,
+			hardDrop,
+			pauseGame,
+		],
+	);
+
+	const { isConnected, isConnecting, connect, disconnect, sendGameState } =
+		useBLEController(handleBLECommand);
+
+	// Send game state to ESP32 when it changes
+	useEffect(() => {
+		if (isConnected) {
+			sendGameState({
+				score,
+				level,
+				lines,
+				isGameOver,
+				isPaused,
+			});
+		}
+	}, [isConnected, score, level, lines, isGameOver, isPaused, sendGameState]);
 
 	const handleKeyDown = useCallback(
 		(event: KeyboardEvent) => {
@@ -71,31 +124,12 @@ export default function TetrisGame() {
 		],
 	);
 
-	// Handle controller button press
-	const handleControllerButtonPress = useCallback(
-		(button: string) => {
-			// Use the same logic as keyboard events
-			const event = { key: button } as KeyboardEvent;
-			handleKeyDown(event);
-		},
-		[handleKeyDown],
-	);
-
-	// Set up keyboard controls
 	useEffect(() => {
 		window.addEventListener("keydown", handleKeyDown);
 		return () => {
 			window.removeEventListener("keydown", handleKeyDown);
 		};
 	}, [handleKeyDown]);
-
-	// Set up controller button handler
-	useEffect(() => {
-		setOnButtonPress(handleControllerButtonPress);
-		return () => {
-			setOnButtonPress(null);
-		};
-	}, [handleControllerButtonPress, setOnButtonPress]);
 
 	// Auto-start the game when component mounts
 	useEffect(() => {
@@ -125,6 +159,12 @@ export default function TetrisGame() {
 				</Card>
 			</div>
 			<div className="flex flex-col gap-4">
+				<BLEConnection
+					isConnected={isConnected}
+					isConnecting={isConnecting}
+					onConnect={connect}
+					onDisconnect={disconnect}
+				/>
 				<Card className="bg-gray-800 border-gray-700 p-4">
 					<h2 className="text-xl font-bold text-white mb-4">
 						Next Piece
@@ -144,7 +184,19 @@ export default function TetrisGame() {
 					/>
 				</Card>
 				<Card className="bg-gray-800 border-gray-700 p-4">
-					<BluetoothStatus />
+					<h2 className="text-xl font-bold text-white mb-2">
+						Controls
+					</h2>
+					<div className="text-gray-300 text-sm space-y-1">
+						<p>← → : Move</p>
+						<p>↑ : Rotate</p>
+						<p>↓ : Soft Drop</p>
+						<p>Space : Hard Drop</p>
+						<p>P : Pause</p>
+						<p className="text-blue-400 mt-2">
+							Or use ESP32 controller!
+						</p>
+					</div>
 				</Card>
 			</div>
 		</div>

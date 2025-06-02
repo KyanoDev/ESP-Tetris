@@ -2,36 +2,24 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	connectionStatusStates,
-	useBluetoothController,
-} from "@/contexts/bluetooth-controller-context";
-import { Bluetooth, BluetoothOff, Check, X } from "lucide-react";
+import { useBLEController } from "@/hooks/use-ble-controller";
+import { Bluetooth, BluetoothOff, Check } from "lucide-react";
 
 export default function BluetoothStatus() {
-	const {
-		isConnected,
-		isConnecting,
-		connectionStatus,
-		error,
-		deviceName,
-		connect,
-		disconnect,
-	} = useBluetoothController();
+	const { isConnected, isConnecting, connect, disconnect } = useBLEController(
+		() => {},
+	);
 
 	const renderStatusBadge = () => {
-		switch (connectionStatus) {
-			case connectionStatusStates.FAILED:
-				return <Badge variant={"destructive"}>ERROR</Badge>;
-			case connectionStatusStates.DISCONNECTED:
-				return <Badge variant={"destructive"}>DISCONNECTED</Badge>;
-			case connectionStatusStates.CONNECTING:
-				return <Badge variant={"secondary"}>CONNECTING</Badge>;
-			case connectionStatusStates.CONNECTED:
-				return <Badge>CONNECTED</Badge>;
-			default:
-				return <Badge variant={"secondary"}>UNKNOWN</Badge>;
+		if (isConnected) {
+			return <Badge>CONNECTED</Badge>;
 		}
+
+		if (isConnecting) {
+			return <Badge variant={"secondary"}>CONNECTING</Badge>;
+		}
+
+		return <Badge variant={"secondary"}>UNKNOWN</Badge>;
 	};
 	return (
 		<div className="space-y-4">
@@ -45,20 +33,13 @@ export default function BluetoothStatus() {
 				</div>
 			</div>
 
-			{error && (
-				<div className="text-red-400 text-sm mb-3 flex items-center gap-1">
-					<X className="h-4 w-4" />
-					{error}
-				</div>
-			)}
-
 			{isConnected ? (
 				<div className="space-y-3">
 					<div className="bg-gray-700 rounded p-2 text-sm">
 						<div className="flex justify-between items-center mb-1">
 							<span className="text-gray-300">Device:</span>
 							<span className="text-white font-mono">
-								{deviceName || "ESP Controller"}
+								ESP Controller
 							</span>
 						</div>
 						<div className="flex justify-between items-center">
