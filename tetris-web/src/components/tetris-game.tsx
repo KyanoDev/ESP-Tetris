@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useBLEController } from "@/hooks/use-ble-controller";
 import { useGameLogic } from "@/hooks/use-game-logic";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import BLEConnection from "./ble-connection";
 import GameBoard from "./game-board";
 import GameControls from "./game-controls";
@@ -30,45 +30,56 @@ export default function TetrisGame() {
 		resetGame,
 	} = useGameLogic();
 
-	const handleBLECommand = useCallback(
-		(command: string) => {
-			if (isGameOver) return;
+	const gameFunctionsRef = useRef({
+		moveLeft,
+		moveRight,
+		rotate,
+		softDrop,
+		hardDrop,
+		pauseGame,
+	});
 
-			console.log(`Received command: ${command}`);
-			switch (command) {
-				case "moveLeft":
-					moveLeft();
-					break;
-				case "moveRight":
-					moveRight();
-					break;
-				case "rotate":
-					rotate();
-					break;
-				case "softDrop":
-					softDrop();
-					break;
-				case "hardDrop":
-					hardDrop();
-					break;
-				case "pause":
-					pauseGame();
-					break;
-				default:
-					break;
-			}
-		},
-		[
-			isGameOver,
+	// Update the ref whenever the functions change
+	useEffect(() => {
+		gameFunctionsRef.current = {
 			moveLeft,
 			moveRight,
 			rotate,
 			softDrop,
 			hardDrop,
 			pauseGame,
-		],
+		};
+	}, [moveLeft, moveRight, rotate, softDrop, hardDrop, pauseGame]);
+
+	const handleCommand = useCallback(
+		(command: string) => {
+			if (isGameOver) return;
+
+			console.log("BLE Command Received:", command);
+			console.log(
+				"Game State - isGameOver:",
+				isGameOver,
+				"isPaused:",
+				isPaused,
+			);
+
+			const functions = gameFunctionsRef.current;
+			if (command === "moveLeft") functions.moveLeft();
+			if (command === "moveRight") functions.moveRight();
+			if (command === "softDrop") functions.softDrop();
+			if (command === "rotate") functions.rotate();
+			if (command === "hardDrop") functions.hardDrop();
+			if (command === "pause") functions.pauseGame();
+		},
+		[isGameOver, isPaused],
 	);
 
+	const handleBLECommand = useCallback(
+		(command: string) => {
+			handleCommand(command);
+		},
+		[handleCommand],
+	);
 	const { isConnected, isConnecting, connect, disconnect, sendGameState } =
 		useBLEController(handleBLECommand);
 

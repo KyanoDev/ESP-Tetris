@@ -18,10 +18,6 @@
 #define TURN_BUTTON_PIN 26
 #define STATUS_LED_PIN 22
 
-// Joystick thresholds
-#define JOYSTICK_THRESHOLD 0
-#define JOYSTICK_CENTER 2800
-
 // Button debounce
 unsigned long lastButtonPress = 0;
 const unsigned long debounceDelay = 150;
@@ -200,40 +196,26 @@ void readJoystick() {
   Serial.println(xValue);
   Serial.println(yValue);
 
-  // Check horizontal movement (left/right)
-  if (xValue < (JOYSTICK_CENTER - JOYSTICK_THRESHOLD) && !joystickLeftPressed) {
-    joystickLeftPressed = true;
-    sendGameCommand("moveLeft");
-    Serial.println("Joystick: Move Left");
-  } else if (xValue > (JOYSTICK_CENTER + JOYSTICK_THRESHOLD) && !joystickRightPressed) {
-    joystickRightPressed = true;
-    sendGameCommand("moveRight");
-    Serial.println("Joystick: Move Right");
-  } else if (xValue > (JOYSTICK_CENTER - JOYSTICK_THRESHOLD) && 
-             xValue < (JOYSTICK_CENTER + JOYSTICK_THRESHOLD)) {
-    joystickLeftPressed = false;
-    joystickRightPressed = false;
-  }
-  
   // Check vertical movement (down)
-  if (yValue > (JOYSTICK_CENTER + JOYSTICK_THRESHOLD) && !joystickDownPressed) {
-    joystickDownPressed = true;
+  if (yValue == 4095) {
     sendGameCommand("softDrop");
     Serial.println("Joystick: Soft Drop");
-  } else if (yValue < (JOYSTICK_CENTER + JOYSTICK_THRESHOLD)) {
-    joystickDownPressed = false;
+    delay(250);
+    return;
   }
-  
-  // Check joystick button (hard drop)
-  bool joystickButtonState = !digitalRead(JOYSTICK_BUTTON_PIN);
-  if (joystickButtonState && !joystickButtonPressed && 
-      (millis() - lastButtonPress > debounceDelay)) {
-    joystickButtonPressed = true;
-    lastButtonPress = millis();
-    sendGameCommand("hardDrop");
-    Serial.println("Joystick Button: Hard Drop");
-  } else if (!joystickButtonState) {
-    joystickButtonPressed = false;
+
+  if (xValue == 0) {
+    sendGameCommand("moveLeft");
+    Serial.println("Joystick: Move Left");
+    delay(250);
+    return;
+  } 
+
+  if (xValue == 4095) {
+    sendGameCommand("moveRight");
+    Serial.println("Joystick: Move Right");
+    delay(250);
+    return;
   }
 }
 

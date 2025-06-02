@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 export interface BLEController {
 	isConnected: boolean;
@@ -107,7 +107,7 @@ export function useBLEController(
 		} finally {
 			setIsConnecting(false);
 		}
-	}, [onCommand, handleDisconnection]);
+	}, [handleDisconnection]);
 
 	const disconnect = useCallback(() => {
 		if (device && device.gatt?.connected) {
@@ -127,18 +127,13 @@ export function useBLEController(
 				});
 
 				const encoder = new TextEncoder();
-				await stateCharacteristic.writeValue(encoder.encode(message));
+				stateCharacteristic.writeValue(encoder.encode(message));
 			} catch (error) {
 				console.error("Error sending game state:", error);
 			}
 		},
 		[stateCharacteristic, isConnected],
 	);
-
-	// Cleanup on unmount
-	useEffect(() => {
-		console.log("EFFECT RUN");
-	}, []);
 
 	return {
 		isConnected,
