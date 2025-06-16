@@ -19,10 +19,8 @@ export function useBLEController(
 	onPause: () => void,
 ): BLEController {
 	const [device, setDevice] = useState<BluetoothDevice | null>(null);
-	const [server, setServer] = useState<BluetoothRemoteGATTServer | null>(
-		null,
-	);
-	const [commandCharacteristic, setCommandCharacteristic] =
+	const [, setServer] = useState<BluetoothRemoteGATTServer | null>(null);
+	const [, setCommandCharacteristic] =
 		useState<BluetoothRemoteGATTCharacteristic | null>(null);
 	const [stateCharacteristic, setStateCharacteristic] =
 		useState<BluetoothRemoteGATTCharacteristic | null>(null);
