@@ -33,7 +33,7 @@ export function useGameLogic() {
 	const [level, setLevel] = useState(1);
 	const [lines, setLines] = useState(0);
 	const [isGameOver, setIsGameOver] = useState(false);
-	const [isPaused, setIsPaused] = useState(false);
+	const [isPaused, setIsPaused] = useState(true);
 	const [dropSpeed, setDropSpeed] = useState(INITIAL_DROP_SPEED);
 
 	// Keep track of locked pieces separately
@@ -353,7 +353,6 @@ export function useGameLogic() {
 		setLevel(1);
 		setLines(0);
 		setIsGameOver(false);
-		setIsPaused(false);
 		setDropSpeed(INITIAL_DROP_SPEED);
 
 		// Set next piece first, then generate active piece

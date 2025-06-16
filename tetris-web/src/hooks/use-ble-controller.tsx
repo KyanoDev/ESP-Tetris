@@ -16,6 +16,7 @@ const STATE_CHAR_UUID = "e4f49389-330b-4e8f-a771-a8056fb6367a";
 
 export function useBLEController(
 	onCommand: (command: string) => void,
+	onPause: () => void,
 ): BLEController {
 	const [device, setDevice] = useState<BluetoothDevice | null>(null);
 	const [server, setServer] = useState<BluetoothRemoteGATTServer | null>(
@@ -30,12 +31,13 @@ export function useBLEController(
 
 	const handleDisconnection = useCallback(() => {
 		console.log("BLE device disconnected");
+		onPause();
 		setIsConnected(false);
 		setDevice(null);
 		setServer(null);
 		setCommandCharacteristic(null);
 		setStateCharacteristic(null);
-	}, []);
+	}, [onPause]);
 
 	const connect = useCallback(async () => {
 		if (!navigator.bluetooth) {

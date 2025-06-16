@@ -81,7 +81,7 @@ export default function TetrisGame() {
 		[handleCommand],
 	);
 	const { isConnected, isConnecting, connect, disconnect, sendGameState } =
-		useBLEController(handleBLECommand);
+		useBLEController(handleBLECommand, pauseGame);
 
 	// Send game state to ESP32 when it changes
 	useEffect(() => {
