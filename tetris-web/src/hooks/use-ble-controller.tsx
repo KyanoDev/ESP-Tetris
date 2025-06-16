@@ -77,7 +77,7 @@ export function useBLEController(
 			await commandChar.startNotifications();
 			commandChar.addEventListener(
 				"characteristicvaluechanged",
-				(event) => {
+				(event: any) => {
 					const target =
 						event.target as BluetoothRemoteGATTCharacteristic;
 					const value = new TextDecoder().decode(target.value!);
@@ -107,7 +107,7 @@ export function useBLEController(
 		} finally {
 			setIsConnecting(false);
 		}
-	}, [handleDisconnection]);
+	}, [handleDisconnection, onCommand]);
 
 	const disconnect = useCallback(() => {
 		if (device && device.gatt?.connected) {
