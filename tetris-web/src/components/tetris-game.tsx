@@ -24,7 +24,6 @@ export default function TetrisGame() {
 		moveRight,
 		rotate,
 		softDrop,
-		hardDrop,
 		startGame,
 		pauseGame,
 		resetGame,
@@ -35,7 +34,6 @@ export default function TetrisGame() {
 		moveRight,
 		rotate,
 		softDrop,
-		hardDrop,
 		pauseGame,
 	});
 
@@ -46,10 +44,9 @@ export default function TetrisGame() {
 			moveRight,
 			rotate,
 			softDrop,
-			hardDrop,
 			pauseGame,
 		};
-	}, [moveLeft, moveRight, rotate, softDrop, hardDrop, pauseGame]);
+	}, [moveLeft, moveRight, rotate, softDrop, pauseGame]);
 
 	const handleCommand = useCallback(
 		(command: string) => {
@@ -68,7 +65,6 @@ export default function TetrisGame() {
 			if (command === "moveRight") functions.moveRight();
 			if (command === "softDrop") functions.softDrop();
 			if (command === "rotate") functions.rotate();
-			if (command === "hardDrop") functions.hardDrop();
 			if (command === "pause") functions.pauseGame();
 		},
 		[isGameOver, isPaused],
@@ -113,9 +109,6 @@ export default function TetrisGame() {
 				case "ArrowDown":
 					softDrop();
 					break;
-				case " ":
-					hardDrop();
-					break;
 				case "p":
 					pauseGame();
 					break;
@@ -130,7 +123,6 @@ export default function TetrisGame() {
 			moveRight,
 			rotate,
 			softDrop,
-			hardDrop,
 			pauseGame,
 		],
 	);
@@ -202,7 +194,6 @@ export default function TetrisGame() {
 						<p>← → : Move</p>
 						<p>↑ : Rotate</p>
 						<p>↓ : Soft Drop</p>
-						<p>Space : Hard Drop</p>
 						<p>P : Pause</p>
 						<p className="text-blue-400 mt-2">
 							Or use ESP32 controller!

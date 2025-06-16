@@ -68,6 +68,7 @@ export function useGameLogic() {
 
 						// Check collision with locked pieces
 						if (boardY >= 0 && lockedPieces[boardY][boardX] !== 0) {
+							console.log(lockedPieces[boardY][boardX]);
 							return false;
 						}
 					}
@@ -307,43 +308,6 @@ export function useGameLogic() {
 		moveDown();
 	}, [moveDown]);
 
-	// Hard drop (move down instantly)
-	const hardDrop = useCallback(() => {
-		if (!activePiece || isGameOver || isPaused) return;
-
-		let newY = activePiece.position.y;
-
-		// Find the lowest valid position
-		while (true) {
-			newY++;
-
-			const testPosition = {
-				...activePiece,
-				position: {
-					...activePiece.position,
-					y: newY,
-				},
-			};
-
-			if (!isValidPosition(testPosition)) {
-				newY--;
-				break;
-			}
-		}
-
-		// Set the piece to the lowest position
-		const newPosition = {
-			...activePiece,
-			position: {
-				...activePiece.position,
-				y: newY,
-			},
-		};
-
-		setActivePiece(newPosition);
-		lockPiece();
-	}, [activePiece, isGameOver, isPaused, isValidPosition, lockPiece]);
-
 	// Start the game
 	const startGame = useCallback(() => {
 		// Reset all game state
@@ -423,7 +387,6 @@ export function useGameLogic() {
 		moveRight,
 		rotate,
 		softDrop,
-		hardDrop,
 		startGame,
 		pauseGame,
 		resetGame,
