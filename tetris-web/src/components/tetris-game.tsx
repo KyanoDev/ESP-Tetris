@@ -186,20 +186,6 @@ export default function TetrisGame() {
 						isGameOver={isGameOver}
 					/>
 				</Card>
-				<Card className="bg-gray-800 border-gray-700 p-4">
-					<h2 className="text-xl font-bold text-white mb-2">
-						Controls
-					</h2>
-					<div className="text-gray-300 text-sm space-y-1">
-						<p>← → : Move</p>
-						<p>↑ : Rotate</p>
-						<p>↓ : Soft Drop</p>
-						<p>P : Pause</p>
-						<p className="text-blue-400 mt-2">
-							Or use ESP32 controller!
-						</p>
-					</div>
-				</Card>
 			</div>
 		</div>
 	);
