@@ -2,7 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bluetooth, BluetoothConnected, Loader2 } from "lucide-react";
+import { Bluetooth, BluetoothConnected, Download, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface BLEConnectionProps {
 	isConnected: boolean;
@@ -17,6 +18,8 @@ export default function BLEConnection({
 	onConnect,
 	onDisconnect,
 }: BLEConnectionProps) {
+
+	const router = useRouter();
 	return (
 		<Card className="bg-gray-800 border-gray-700">
 			<CardHeader>
@@ -72,6 +75,16 @@ export default function BLEConnection({
 						Make sure your ESP32 controller is powered on and in
 						range.
 					</div>
+
+					<Button
+							className="w-full"
+							variant={"outline"}
+							onClick={() => router.push("/firmware/tetris-controller.ino")}
+						>
+
+							<Download className="mr-2 h-4 w-4" />
+							Download Firmware
+						</Button>
 				</div>
 			</CardContent>
 		</Card>
