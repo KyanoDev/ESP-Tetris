@@ -6,13 +6,13 @@ import { useCallback, useEffect, useState } from "react";
 // Constants
 const BOARD_WIDTH = 10;
 const BOARD_HEIGHT = 20;
-const INITIAL_DROP_SPEED = 1000; // ms
-const SPEED_INCREASE_PER_LEVEL = 100; // ms
-const MIN_DROP_SPEED = 100; // ms
+const INITIAL_DROP_SPEED = 1000; 
+const SPEED_INCREASE_PER_LEVEL = 100;
+const MIN_DROP_SPEED = 100; 
 const POINTS_PER_LINE = 100;
 const LINES_PER_LEVEL = 10;
 
-// Create an empty board
+
 const createEmptyBoard = () =>
 	Array(BOARD_HEIGHT)
 		.fill(0)
